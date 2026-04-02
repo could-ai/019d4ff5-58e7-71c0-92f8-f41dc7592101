@@ -1,0 +1,543 @@
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+    &lt;title&gt;World Media&lt;/title&gt;
+    &lt;meta name="description" content="YouTube-like video platform"&gt;
+    &lt;meta name="theme-color" content="#0f0f0f"&gt;
+    &lt;link rel="manifest" href="data:application/manifest+json,{\"name\":\"World Media\",\"short_name\":\"WM\",\"start_url\":\"./world_media.html\",\"display\":\"standalone\",\"background_color\":\"#0f0f0f\",\"theme_color\":\"#0f0f0f\"}"&gt;
+    &lt;style&gt;
+        /* Reset and Base Styles */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Roboto', sans-serif; background: #0f0f0f; color: #fff; overflow-x: hidden; }
+        .light-mode { background: #fff; color: #000; }
+        .light-mode .card, .light-mode .sidebar, .light-mode .bottom-nav, .light-mode .modal { background: #f9f9f9; color: #000; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Responsive Layout */
+        .container { display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #212121; padding: 20px; position: fixed; height: 100vh; overflow-y: auto; z-index: 1000; transform: translateX(-100%); transition: transform 0.3s; }
+        .sidebar.open { transform: translateX(0); }
+        .main-content { flex: 1; padding: 20px; margin-left: 0; transition: margin-left 0.3s; }
+        .main-content.sidebar-open { margin-left: 240px; }
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #212121; display: flex; justify-content: space-around; padding: 10px; z-index: 1000; }
+        .bottom-nav a { color: #fff; text-decoration: none; flex: 1; text-align: center; padding: 10px; }
+        .bottom-nav a.active { color: #ff0000; }
+
+        /* Desktop Styles */
+        @media (min-width: 768px) {
+            .sidebar { transform: translateX(0); }
+            .main-content { margin-left: 240px; }
+            .bottom-nav { display: none; }
+        }
+
+        /* Cards and Layout */
+        .card { background: #212121; border-radius: 8px; margin: 10px 0; overflow: hidden; transition: transform 0.2s; }
+        .card:hover { transform: scale(1.02); }
+        .card img { width: 100%; height: 180px; object-fit: cover; }
+        .card-content { padding: 15px; }
+        .card-title { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+        .card-meta { font-size: 14px; color: #aaa; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .list { display: flex; flex-direction: column; }
+
+        /* Video Player */
+        .video-player { position: relative; background: #000; }
+        .video-player video { width: 100%; height: auto; }
+        .video-controls { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.8); padding: 10px; display: flex; justify-content: space-between; }
+        .video-info { padding: 20px; }
+        .video-actions { display: flex; gap: 10px; margin: 10px 0; }
+        .btn { background: #ff0000; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #cc0000; }
+        .btn.secondary { background: #333; }
+
+        /* Forms and Modals */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: #212121; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
+        .form-group input[type="file"] { padding: 5px; }
+
+        /* Shorts */
+        .shorts-container { height: 100vh; overflow-y: scroll; scroll-snap-type: y mandatory; }
+        .short { height: 100vh; scroll-snap-align: start; position: relative; }
+        .short video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Search and Filters */
+        .search-bar { padding: 20px; }
+        .search-bar input { width: 100%; padding: 10px; background: #333; color: #fff; border: none; border-radius: 25px; }
+
+        /* Notifications */
+        .notifications { position: fixed; top: 20px; right: 20px; background: #333; padding: 10px; border-radius: 4px; max-width: 300px; z-index: 1500; }
+
+        /* PWA and Offline */
+        .offline-banner { background: #ff0000; color: #fff; padding: 10px; text-align: center; }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id="app"&gt;
+        &lt;!-- Sidebar (Desktop) --&gt;
+        &lt;div class="sidebar" id="sidebar"&gt;
+            &lt;h2&gt;World Media&lt;/h2&gt;
+            &lt;a href="#" onclick="showPage('home')"&gt;Home&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('shorts')"&gt;Shorts&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('subscriptions')"&gt;Subscriptions&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('profile')"&gt;Profile&lt;/a&gt;
+            &lt;a href="#" onclick="toggleTheme()"&gt;Toggle Theme&lt;/a&gt;
+            &lt;a href="#" onclick="logout()"&gt;Logout&lt;/a&gt;
+        &lt;/div&gt;
+
+        &lt;!-- Main Content --&gt;
+        &lt;div class="main-content" id="main-content"&gt;
+            &lt;!-- Auth Pages --&gt;
+            &lt;div id="auth" class="page"&gt;
+                &lt;div class="modal"&gt;
+                    &lt;div class="modal-content"&gt;
+                        &lt;h2&gt;Login&lt;/h2&gt;
+                        &lt;form onsubmit="login(event)"&gt;
+                            &lt;div class="form-group"&gt;
+                                &lt;label&gt;Email&lt;/label&gt;
+                                &lt;input type="email" id="login-email" required&gt;
+                            &lt;/div&gt;
+                            &lt;div class="form-group"&gt;
+                                &lt;label&gt;Password&lt;/label&gt;
+                                &lt;input type="password" id="login-password" required&gt;
+                            &lt;/div&gt;
+                            &lt;button type="submit" class="btn"&gt;Login&lt;/button&gt;
+                            &lt;p&gt;&lt;a href="#" onclick="showRegister()"&gt;Register&lt;/a&gt;&lt;/p&gt;
+                        &lt;/form&gt;
+                        &lt;div id="auth-error"&gt;&lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Home Feed --&gt;
+            &lt;div id="home" class="page hidden"&gt;
+                &lt;div class="search-bar"&gt;
+                    &lt;input type="text" placeholder="Search videos..." oninput="searchVideos(this.value)"&gt;
+                &lt;/div&gt;
+                &lt;div id="video-feed" class="grid"&gt;&lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Video Player --&gt;
+            &lt;div id="video-page" class="page hidden"&gt;
+                &lt;div class="video-player"&gt;
+                    &lt;video id="video-element" controls&gt;&lt;/video&gt;
+                    &lt;div class="video-controls"&gt;
+                        &lt;button onclick="togglePlay()"&gt;Play/Pause&lt;/button&gt;
+                        &lt;input type="range" id="volume" min="0" max="1" step="0.1" onchange="setVolume(this.value)"&gt;
+                        &lt;button onclick="toggleFullscreen()"&gt;Fullscreen&lt;/button&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class="video-info"&gt;
+                    &lt;h1 id="video-title"&gt;&lt;/h1&gt;
+                    &lt;p id="video-description"&gt;&lt;/p&gt;
+                    &lt;p id="channel-info"&gt;&lt;/p&gt;
+                    &lt;div class="video-actions"&gt;
+                        &lt;button onclick="likeVideo()" class="btn"&gt;Like&lt;/button&gt;
+                        &lt;button onclick="dislikeVideo()" class="btn secondary"&gt;Dislike&lt;/button&gt;
+                        &lt;button onclick="shareVideo()" class="btn secondary"&gt;Share&lt;/button&gt;
+                        &lt;button onclick="addToWatchLater()" class="btn secondary"&gt;Watch Later&lt;/button&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div id="comments"&gt;
+                    &lt;h3&gt;Comments&lt;/h3&gt;
+                    &lt;textarea id="comment-input" placeholder="Add a comment..."&gt;&lt;/textarea&gt;
+                    &lt;button onclick="addComment()" class="btn"&gt;Post&lt;/button&gt;
+                    &lt;div id="comment-list"&gt;&lt;/div&gt;
+                &lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Upload --&gt;
+            &lt;div id="upload" class="page hidden"&gt;
+                &lt;h2&gt;Upload Video&lt;/h2&gt;
+                &lt;form onsubmit="uploadVideo(event)"&gt;
+                    &lt;div class="form-group"&gt;
+                        &lt;label&gt;Video File&lt;/label&gt;
+                        &lt;input type="file" id="video-file" accept="video/*" required&gt;
+                    &lt;/div&gt;
+                    &lt;div class="form-group"&gt;
+                        &lt;label&gt;Title&lt;/label&gt;
+                        &lt;input type="text" id="video-title-input" required&gt;
+                    &lt;/div&gt;
+                    &lt;div class="form-group"&gt;
+                        &lt;label&gt;Description&lt;/label&gt;
+                        &lt;textarea id="video-description-input"&gt;&lt;/textarea&gt;
+                    &lt;/div&gt;
+                    &lt;div class="form-group"&gt;
+                        &lt;label&gt;Thumbnail&lt;/label&gt;
+                        &lt;input type="file" id="thumbnail-file" accept="image/*"&gt;
+                    &lt;/div&gt;
+                    &lt;button type="submit" class="btn"&gt;Upload&lt;/button&gt;
+                &lt;/form&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Shorts --&gt;
+            &lt;div id="shorts" class="page hidden"&gt;
+                &lt;div class="shorts-container" id="shorts-container"&gt;&lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Profile/Channel --&gt;
+            &lt;div id="profile" class="page hidden"&gt;
+                &lt;h2&gt;Your Channel&lt;/h2&gt;
+                &lt;p&gt;Name: &lt;span id="profile-name"&gt;&lt;/span&gt;&lt;/p&gt;
+                &lt;img id="profile-pic" src="" alt="Profile" style="width: 100px; height: 100px; border-radius: 50%;"&gt;
+                &lt;div id="user-videos" class="grid"&gt;&lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Subscriptions --&gt;
+            &lt;div id="subscriptions" class="page hidden"&gt;
+                &lt;h2&gt;Subscriptions&lt;/h2&gt;
+                &lt;div id="subscribed-channels" class="list"&gt;&lt;/div&gt;
+            &lt;/div&gt;
+
+            &lt;!-- Playlists --&gt;
+            &lt;div id="playlists" class="page hidden"&gt;
+                &lt;h2&gt;Playlists&lt;/h2&gt;
+                &lt;button onclick="createPlaylist()" class="btn"&gt;Create Playlist&lt;/button&gt;
+                &lt;div id="playlist-list"&gt;&lt;/div&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;!-- Bottom Nav (Mobile) --&gt;
+        &lt;div class="bottom-nav" id="bottom-nav"&gt;
+            &lt;a href="#" onclick="showPage('home')" class="active"&gt;Home&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('shorts')"&gt;Shorts&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('upload')"&gt;Upload&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('subscriptions')"&gt;Subs&lt;/a&gt;
+            &lt;a href="#" onclick="showPage('profile')"&gt;Profile&lt;/a&gt;
+        &lt;/div&gt;
+
+        &lt;!-- Notifications --&gt;
+        &lt;div id="notifications" class="notifications hidden"&gt;&lt;/div&gt;
+
+        &lt;!-- Offline Banner --&gt;
+        &lt;div id="offline-banner" class="offline-banner hidden"&gt;You are offline. Some features may not work.&lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;script&gt;
+        // Global State
+        let currentUser = null;
+        let currentVideo = null;
+        let videos = JSON.parse(localStorage.getItem('videos')) || [];
+        let users = JSON.parse(localStorage.getItem('users')) || [];
+        let playlists = JSON.parse(localStorage.getItem('playlists')) || [];
+        let watchHistory = JSON.parse(localStorage.getItem('watchHistory')) || [];
+        let watchLater = JSON.parse(localStorage.getItem('watchLater')) || [];
+        let notifications = JSON.parse(localStorage.getItem('notifications')) || [];
+        let isDarkMode = true;
+
+        // Device Detection
+        const isMobile = window.innerWidth &lt; 768;
+        if (isMobile) {
+            document.getElementById('sidebar').classList.add('hidden');
+        }
+
+        // Theme Toggle
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('light-mode', !isDarkMode);
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        }
+
+        // Auth
+        function showRegister() {
+            document.getElementById('auth').innerHTML = `
+                &lt;div class="modal"&gt;
+                    &lt;div class="modal-content"&gt;
+                        &lt;h2&gt;Register&lt;/h2&gt;
+                        &lt;form onsubmit="register(event)"&gt;
+                            &lt;div class="form-group"&gt;
+                                &lt;label&gt;Email&lt;/label&gt;
+                                &lt;input type="email" id="reg-email" required&gt;
+                            &lt;/div&gt;
+                            &lt;div class="form-group"&gt;
+                                &lt;label&gt;Password&lt;/label&gt;
+                                &lt;input type="password" id="reg-password" required&gt;
+                            &lt;/div&gt;
+                            &lt;div class="form-group"&gt;
+                                &lt;label&gt;Name&lt;/label&gt;
+                                &lt;input type="text" id="reg-name" required&gt;
+                            &lt;/div&gt;
+                            &lt;button type="submit" class="btn"&gt;Register&lt;/button&gt;
+                            &lt;p&gt;&lt;a href="#" onclick="showLogin()"&gt;Login&lt;/a&gt;&lt;/p&gt;
+                        &lt;/form&gt;
+                        &lt;div id="auth-error"&gt;&lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            `;
+        }
+
+        function showLogin() {
+            location.reload();
+        }
+
+        function register(event) {
+            event.preventDefault();
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const name = document.getElementById('reg-name').value;
+            if (users.find(u =&gt; u.email === email)) {
+                document.getElementById('auth-error').textContent = 'Account already exists';
+                return;
+            }
+            users.push({ email, password, name, profilePic: '', videos: [], subscribers: [] });
+            localStorage.setItem('users', JSON.stringify(users));
+            loginWithCreds(email, password);
+        }
+
+        function login(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginWithCreds(email, password);
+        }
+
+        function loginWithCreds(email, password) {
+            const user = users.find(u =&gt; u.email === email &amp;&amp; u.password === password);
+            if (!user) {
+                document.getElementById('auth-error').textContent = 'Invalid credentials';
+                return;
+            }
+            currentUser = user;
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            showPage('home');
+            renderFeed();
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            location.reload();
+        }
+
+        // Navigation
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p =&gt; p.classList.add('hidden'));
+            document.getElementById(page).classList.remove('hidden');
+            document.querySelectorAll('.bottom-nav a').forEach(a =&gt; a.classList.remove('active'));
+            document.querySelector(`.bottom-nav a[onclick*="showPage('${page}')"]`).classList.add('active');
+            if (page === 'profile') renderProfile();
+            if (page === 'subscriptions') renderSubscriptions();
+            if (page === 'playlists') renderPlaylists();
+            if (page === 'shorts') renderShorts();
+        }
+
+        // Feed
+        function renderFeed(search = '') {
+            const feed = videos.filter(v =&gt; v.title.toLowerCase().includes(search.toLowerCase()));
+            const feedEl = document.getElementById('video-feed');
+            feedEl.innerHTML = feed.map(v =&gt; `
+                &lt;div class="card" onclick="playVideo('${v.id}')"&gt;
+                    &lt;img src="${v.thumbnail}" alt="${v.title}"&gt;
+                    &lt;div class="card-content"&gt;
+                        &lt;div class="card-title"&gt;${v.title}&lt;/div&gt;
+                        &lt;div class="card-meta"&gt;${v.channel} • ${v.views} views&lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            `).join('');
+        }
+
+        function searchVideos(query) {
+            renderFeed(query);
+        }
+
+        // Video Player
+        function playVideo(id) {
+            currentVideo = videos.find(v =&gt; v.id === id);
+            if (!currentVideo) return;
+            currentVideo.views++;
+            watchHistory.push({ id, timestamp: Date.now() });
+            localStorage.setItem('videos', JSON.stringify(videos));
+            localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+            document.getElementById('video-element').src = currentVideo.url;
+            document.getElementById('video-title').textContent = currentVideo.title;
+            document.getElementById('video-description').textContent = currentVideo.description;
+            document.getElementById('channel-info').textContent = `By ${currentVideo.channel}`;
+            renderComments();
+            showPage('video-page');
+            // Auto-play next (simplified)
+            setTimeout(() =&gt; {
+                const next = videos[Math.floor(Math.random() * videos.length)];
+                if (next) playVideo(next.id);
+            }, 30000);
+        }
+
+        function togglePlay() {
+            const video = document.getElementById('video-element');
+            video.paused ? video.play() : video.pause();
+        }
+
+        function setVolume(val) {
+            document.getElementById('video-element').volume = val;
+        }
+
+        function toggleFullscreen() {
+            const video = document.getElementById('video-element');
+            if (video.requestFullscreen) video.requestFullscreen();
+        }
+
+        function likeVideo() {
+            // Simulate like
+            alert('Liked!');
+        }
+
+        function dislikeVideo() {
+            alert('Disliked!');
+        }
+
+        function shareVideo() {
+            navigator.share ? navigator.share({ title: currentVideo.title, url: window.location.href }) : alert('Share link: ' + window.location.href);
+        }
+
+        function addToWatchLater() {
+            watchLater.push(currentVideo.id);
+            localStorage.setItem('watchLater', JSON.stringify(watchLater));
+            alert('Added to Watch Later');
+        }
+
+        // Upload
+        function uploadVideo(event) {
+            event.preventDefault();
+            const file = document.getElementById('video-file').files[0];
+            const title = document.getElementById('video-title-input').value;
+            const description = document.getElementById('video-description-input').value;
+            const thumbnailFile = document.getElementById('thumbnail-file').files[0];
+            const reader = new FileReader();
+            reader.onload = () =&gt; {
+                const url = reader.result;
+                const thumbnail = thumbnailFile ? URL.createObjectURL(thumbnailFile) : '';
+                const video = {
+                    id: Date.now().toString(),
+                    title,
+                    description,
+                    url,
+                    thumbnail,
+                    channel: currentUser.name,
+                    views: 0,
+                    comments: []
+                };
+                videos.push(video);
+                currentUser.videos.push(video.id);
+                localStorage.setItem('videos', JSON.stringify(videos));
+                localStorage.setItem('users', JSON.stringify(users));
+                showPage('home');
+                renderFeed();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Shorts
+        function renderShorts() {
+            const shorts = videos.filter(v =&gt; v.title.includes('Short')); // Simulate shorts
+            const container = document.getElementById('shorts-container');
+            container.innerHTML = shorts.map(v =&gt; `
+                &lt;div class="short"&gt;
+                    &lt;video src="${v.url}" muted autoplay loop&gt;&lt;/video&gt;
+                    &lt;div style="position: absolute; bottom: 20px; left: 20px; color: white;"&gt;
+                        &lt;h3&gt;${v.title}&lt;/h3&gt;
+                        &lt;p&gt;${v.channel}&lt;/p&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            `).join('');
+        }
+
+        // Comments
+        function addComment() {
+            const text = document.getElementById('comment-input').value;
+            if (!text) return;
+            currentVideo.comments.push({ user: currentUser.name, text, timestamp: Date.now() });
+            localStorage.setItem('videos', JSON.stringify(videos));
+            renderComments();
+            document.getElementById('comment-input').value = '';
+        }
+
+        function renderComments() {
+            const list = document.getElementById('comment-list');
+            list.innerHTML = currentVideo.comments.map(c =&gt; `
+                &lt;div&gt;&lt;strong&gt;${c.user}&lt;/strong&gt;: ${c.text}&lt;/div&gt;
+            `).join('');
+        }
+
+        // Profile
+        function renderProfile() {
+            document.getElementById('profile-name').textContent = currentUser.name;
+            document.getElementById('profile-pic').src = currentUser.profilePic || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjY2NjIi8+Cjwvc3ZnPg==';
+            const userVideos = videos.filter(v =&gt; v.channel === currentUser.name);
+            document.getElementById('user-videos').innerHTML = userVideos.map(v =&gt; `
+                &lt;div class="card" onclick="playVideo('${v.id}')"&gt;
+                    &lt;img src="${v.thumbnail}" alt="${v.title}"&gt;
+                    &lt;div class="card-content"&gt;
+                        &lt;div class="card-title"&gt;${v.title}&lt;/div&gt;
+                        &lt;div class="card-meta"&gt;${v.views} views&lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
+            `).join('');
+        }
+
+        // Subscriptions
+        function renderSubscriptions() {
+            const subs = users.filter(u =&gt; currentUser.subscribers.includes(u.email));
+            document.getElementById('subscribed-channels').innerHTML = subs.map(u =&gt; `
+                &lt;div class="card"&gt;
+                    &lt;img src="${u.profilePic || 'default.jpg'}" alt="${u.name}" style="width: 50px; height: 50px; border-radius: 50%;"&gt;
+                    &lt;div&gt;${u.name}&lt;/div&gt;
+                    &lt;button onclick="unsubscribe('${u.email}')" class="btn secondary"&gt;Unsubscribe&lt;/button&gt;
+                &lt;/div&gt;
+            `).join('');
+        }
+
+        function unsubscribe(email) {
+            currentUser.subscribers = currentUser.subscribers.filter(e =&gt; e !== email);
+            localStorage.setItem('users', JSON.stringify(users));
+            renderSubscriptions();
+        }
+
+        // Playlists
+        function createPlaylist() {
+            const name = prompt('Playlist name:');
+            if (name) {
+                playlists.push({ id: Date.now().toString(), name, videos: [] });
+                localStorage.setItem('playlists', JSON.stringify(playlists));
+                renderPlaylists();
+            }
+        }
+
+        function renderPlaylists() {
+            document.getElementById('playlist-list').innerHTML = playlists.map(p =&gt; `
+                &lt;div&gt;
+                    &lt;h3&gt;${p.name}&lt;/h3&gt;
+                    &lt;div&gt;${p.videos.map(id =&gt; videos.find(v =&gt; v.id === id)?.title).join(', ')}&lt;/div&gt;
+                &lt;/div&gt;
+            `).join('');
+        }
+
+        // Notifications
+        function showNotification(msg) {
+            notifications.push({ msg, timestamp: Date.now() });
+            localStorage.setItem('notifications', JSON.stringify(notifications));
+            document.getElementById('notifications').innerHTML = notifications.slice(-5).map(n =&gt; `&lt;div&gt;${n.msg}&lt;/div&gt;`).join('');
+            document.getElementById('notifications').classList.remove('hidden');
+            setTimeout(() =&gt; document.getElementById('notifications').classList.add('hidden'), 5000);
+        }
+
+        // Offline Support
+        window.addEventListener('online', () =&gt; document.getElementById('offline-banner').classList.add('hidden'));
+        window.addEventListener('offline', () =&gt; document.getElementById('offline-banner').classList.remove('hidden'));
+
+        // Init
+        const savedUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (savedUser) {
+            currentUser = savedUser;
+            showPage('home');
+            renderFeed();
+        }
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') toggleTheme();
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
